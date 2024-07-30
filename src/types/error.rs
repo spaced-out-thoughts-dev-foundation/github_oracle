@@ -7,5 +7,5 @@ pub enum Error {
     Unauthorized = 1,
     RepoMissing = 2,
     RepoAlreadyExists = 3,
-    RepoLimitExceeded = 7,
+    RepoLimitExceeded = 4,
 }
