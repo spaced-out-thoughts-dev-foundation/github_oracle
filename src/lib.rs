@@ -44,6 +44,11 @@ impl GithubOracleContract {
         Self::__add_repos(&e, repos);
     }
 
+    pub fn clear_repos(e: Env) {
+        e.panic_if_not_admin();
+        e.set_repos(Vec::new(&e));
+    }
+
     pub fn remove_repos(e: Env, repos: Vec<String>) {
         e.panic_if_not_admin();
         Self::__remove_repos(&e, repos);

@@ -139,3 +139,19 @@ fn attempt_to_remove_repo_that_does_not_exist() {
     let repos_to_remove = vec![&env, digicus_repo(&env)];
     client.remove_repos(&repos_to_remove);
 }
+
+#[test]
+fn adds_then_clears_repos() {
+    let (env, client, _config) = setup_contract();
+
+    let repos_to_add: Vec<String> = vec![&env, soroban_sdk_repo(&env)];
+    client.add_repos(&repos_to_add.clone());
+
+    let repos = client.get_repos();
+    assert_eq!(repos, repos_to_add);
+
+    client.clear_repos();
+
+    let repos = client.get_repos();
+    assert_eq!(repos, vec![&env]);
+}
