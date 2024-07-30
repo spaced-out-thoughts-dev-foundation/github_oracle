@@ -46,6 +46,11 @@ impl GithubOracleContract {
 
     pub fn clear_repos(e: Env) {
         e.panic_if_not_admin();
+
+        e.get_repos()
+            .iter()
+            .for_each(|repo| e.remove_repo_index(&repo));
+
         e.set_repos(Vec::new(&e));
     }
 
