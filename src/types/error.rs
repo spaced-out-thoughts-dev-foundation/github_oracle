@@ -8,4 +8,7 @@ pub enum Error {
     RepoMissing = 2,
     RepoAlreadyExists = 3,
     RepoLimitExceeded = 4,
+    IssueAlreadyExists = 5,
+    IssueLimitExceeded = 6,
+    IssueMissing = 7,
 }

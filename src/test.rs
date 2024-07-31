@@ -68,7 +68,7 @@ fn adds_two_repos() {
 
     let repos = client.get_repos();
 
-    assert_eq!(repos, new_repos);
+    assert_repo_names(repos, new_repos);
 }
 
 #[test]
@@ -91,7 +91,8 @@ fn adds_repos_twice() {
         soroban_cli_repo(&env),
         digicus_repo(&env),
     ];
-    assert_eq!(repos, expected_repos);
+
+    assert_repo_names(repos, expected_repos);
 }
 
 #[test]
@@ -154,4 +155,310 @@ fn adds_then_clears_repos() {
 
     let repos = client.get_repos();
     assert_eq!(repos, vec![&env]);
+}
+
+#[test]
+fn adds_then_clears_repo_with_issues() {
+    let (env, client, _config) = setup_contract();
+
+    let repos_to_add: Vec<String> = vec![&env, soroban_sdk_repo(&env)];
+    client.add_repos(&repos_to_add.clone());
+
+    let issues_to_add: Vec<String> = vec![
+        &env,
+        String::from_str(&env, "issue-1"),
+        String::from_str(&env, "issue-2"),
+        String::from_str(&env, "issue-3"),
+    ];
+    client.add_issues(&soroban_sdk_repo(&env), &issues_to_add.clone());
+
+    let repos = client.get_repos();
+    assert_eq!(repos, repos_to_add);
+
+    client.clear_repos();
+
+    let repos = client.get_repos();
+    assert_eq!(repos, vec![&env]);
+}
+
+#[test]
+fn get_issues_empty() {
+    let (env, client, _config) = setup_contract();
+
+    let repos_to_add: Vec<String> = vec![&env, soroban_sdk_repo(&env)];
+    client.add_repos(&repos_to_add.clone());
+
+    let issues = client.get_issues_for_repo(&soroban_sdk_repo(&env));
+    assert_eq!(issues, Map::new(&env));
+}
+
+#[test]
+fn add_single_issue() {
+    let (env, client, _config) = setup_contract();
+
+    let repos_to_add: Vec<String> = vec![&env, soroban_sdk_repo(&env)];
+    client.add_repos(&repos_to_add.clone());
+
+    let issues_to_add: Vec<String> = vec![&env, String::from_str(&env, "issue-1")];
+    client.add_issues(&soroban_sdk_repo(&env), &issues_to_add.clone());
+
+    let mut expected: Map<String, String> = Map::new(&env);
+    expected.set(
+        String::from_str(&env, "issue-1"),
+        String::from_str(&env, "unclaimed"),
+    );
+
+    let issues = client.get_issues_for_repo(&soroban_sdk_repo(&env));
+    assert_eq!(issues, expected);
+}
+
+#[test]
+fn add_multiple_issues() {
+    let (env, client, _config) = setup_contract();
+
+    let repos_to_add: Vec<String> = vec![&env, soroban_sdk_repo(&env)];
+    client.add_repos(&repos_to_add.clone());
+
+    let issues_to_add: Vec<String> = vec![
+        &env,
+        String::from_str(&env, "issue-1"),
+        String::from_str(&env, "issue-2"),
+        String::from_str(&env, "issue-3"),
+    ];
+    client.add_issues(&soroban_sdk_repo(&env), &issues_to_add.clone());
+
+    let mut expected: Map<String, String> = Map::new(&env);
+    expected.set(
+        String::from_str(&env, "issue-1"),
+        String::from_str(&env, "unclaimed"),
+    );
+    expected.set(
+        String::from_str(&env, "issue-2"),
+        String::from_str(&env, "unclaimed"),
+    );
+    expected.set(
+        String::from_str(&env, "issue-3"),
+        String::from_str(&env, "unclaimed"),
+    );
+
+    let issues = client.get_issues_for_repo(&soroban_sdk_repo(&env));
+    assert_eq!(issues, expected);
+}
+
+#[test]
+fn add_issues_twice() {
+    let (env, client, _config) = setup_contract();
+
+    let repos_to_add: Vec<String> = vec![&env, soroban_sdk_repo(&env), digicus_repo(&env)];
+    client.add_repos(&repos_to_add.clone());
+
+    let issues_to_add: Vec<String> = vec![
+        &env,
+        String::from_str(&env, "issue-1"),
+        String::from_str(&env, "issue-2"),
+        String::from_str(&env, "issue-3"),
+    ];
+    client.add_issues(&soroban_sdk_repo(&env), &issues_to_add.clone());
+
+    let mut expected: Map<String, String> = Map::new(&env);
+    expected.set(
+        String::from_str(&env, "issue-1"),
+        String::from_str(&env, "unclaimed"),
+    );
+    expected.set(
+        String::from_str(&env, "issue-2"),
+        String::from_str(&env, "unclaimed"),
+    );
+    expected.set(
+        String::from_str(&env, "issue-3"),
+        String::from_str(&env, "unclaimed"),
+    );
+
+    let issues = client.get_issues_for_repo(&soroban_sdk_repo(&env));
+    assert_eq!(issues, expected);
+
+    let issues_to_add: Vec<String> = vec![
+        &env,
+        String::from_str(&env, "issue-4"),
+        String::from_str(&env, "issue-5"),
+    ];
+    client.add_issues(&digicus_repo(&env), &issues_to_add.clone());
+
+    let mut expected2: Map<String, String> = Map::new(&env);
+    expected2.set(
+        String::from_str(&env, "issue-4"),
+        String::from_str(&env, "unclaimed"),
+    );
+    expected2.set(
+        String::from_str(&env, "issue-5"),
+        String::from_str(&env, "unclaimed"),
+    );
+
+    let issues = client.get_issues_for_repo(&digicus_repo(&env));
+    assert_eq!(issues, expected2);
+
+    let mut expected_all_repos_with_issues: Map<String, Map<String, String>> = Map::new(&env);
+    expected_all_repos_with_issues.set(soroban_sdk_repo(&env), expected);
+    expected_all_repos_with_issues.set(digicus_repo(&env), expected2);
+    assert_eq!(
+        client.get_repos_and_issues(),
+        expected_all_repos_with_issues
+    );
+}
+
+#[test]
+#[should_panic]
+fn add_issues_to_nonexistent_repo() {
+    let (env, client, _config) = setup_contract();
+
+    let repos_to_add: Vec<String> = vec![&env, soroban_sdk_repo(&env)];
+    client.add_repos(&repos_to_add.clone());
+
+    let issues_to_add: Vec<String> = vec![
+        &env,
+        String::from_str(&env, "issue-1"),
+        String::from_str(&env, "issue-2"),
+        String::from_str(&env, "issue-3"),
+    ];
+    client.add_issues(&digicus_repo(&env), &issues_to_add.clone());
+}
+
+#[test]
+fn remove_single_issue() {
+    let (env, client, _config) = setup_contract();
+
+    let repos_to_add: Vec<String> = vec![&env, soroban_sdk_repo(&env)];
+    client.add_repos(&repos_to_add.clone());
+
+    let issues_to_add: Vec<String> = vec![&env, String::from_str(&env, "issue-1")];
+    client.add_issues(&soroban_sdk_repo(&env), &issues_to_add.clone());
+
+    let issues = client.get_issues_for_repo(&soroban_sdk_repo(&env));
+    assert_eq!(issues.len(), 1);
+
+    let issues_to_remove: Vec<String> = vec![&env, String::from_str(&env, "issue-1")];
+    client.remove_issues(&soroban_sdk_repo(&env), &issues_to_remove.clone());
+
+    let issues = client.get_issues_for_repo(&soroban_sdk_repo(&env));
+    assert_eq!(issues.len(), 0);
+}
+
+#[test]
+fn remove_multiple_issues() {
+    let (env, client, _config) = setup_contract();
+
+    let repos_to_add: Vec<String> = vec![&env, soroban_sdk_repo(&env)];
+    client.add_repos(&repos_to_add.clone());
+
+    let issues_to_add: Vec<String> = vec![
+        &env,
+        String::from_str(&env, "issue-1"),
+        String::from_str(&env, "issue-2"),
+        String::from_str(&env, "issue-3"),
+    ];
+    client.add_issues(&soroban_sdk_repo(&env), &issues_to_add.clone());
+
+    let issues = client.get_issues_for_repo(&soroban_sdk_repo(&env));
+    assert_eq!(issues.len(), 3);
+
+    let issues_to_remove: Vec<String> = vec![
+        &env,
+        String::from_str(&env, "issue-1"),
+        String::from_str(&env, "issue-3"),
+    ];
+    client.remove_issues(&soroban_sdk_repo(&env), &issues_to_remove.clone());
+
+    let issues = client.get_issues_for_repo(&soroban_sdk_repo(&env));
+    assert_eq!(issues.len(), 1);
+}
+
+#[test]
+fn remove_issues_twice() {
+    let (env, client, _config) = setup_contract();
+
+    let repos_to_add: Vec<String> = vec![&env, soroban_sdk_repo(&env)];
+    client.add_repos(&repos_to_add.clone());
+
+    let issues_to_add: Vec<String> = vec![
+        &env,
+        String::from_str(&env, "issue-1"),
+        String::from_str(&env, "issue-2"),
+        String::from_str(&env, "issue-3"),
+    ];
+    client.add_issues(&soroban_sdk_repo(&env), &issues_to_add.clone());
+
+    let issues = client.get_issues_for_repo(&soroban_sdk_repo(&env));
+    assert_eq!(issues.len(), 3);
+
+    let issues_to_remove: Vec<String> = vec![
+        &env,
+        String::from_str(&env, "issue-1"),
+        String::from_str(&env, "issue-3"),
+    ];
+    client.remove_issues(&soroban_sdk_repo(&env), &issues_to_remove.clone());
+
+    let issues = client.get_issues_for_repo(&soroban_sdk_repo(&env));
+    assert_eq!(issues.len(), 1);
+
+    let issues_to_remove: Vec<String> = vec![&env, String::from_str(&env, "issue-2")];
+    client.remove_issues(&soroban_sdk_repo(&env), &issues_to_remove.clone());
+
+    let issues = client.get_issues_for_repo(&soroban_sdk_repo(&env));
+    assert_eq!(issues.len(), 0);
+}
+
+#[test]
+#[should_panic]
+fn remove_issues_from_nonexistent_repo() {
+    let (env, client, _config) = setup_contract();
+
+    let repos_to_add: Vec<String> = vec![&env, soroban_sdk_repo(&env)];
+    client.add_repos(&repos_to_add.clone());
+
+    let issues_to_add: Vec<String> = vec![
+        &env,
+        String::from_str(&env, "issue-1"),
+        String::from_str(&env, "issue-2"),
+        String::from_str(&env, "issue-3"),
+    ];
+    client.add_issues(&soroban_sdk_repo(&env), &issues_to_add.clone());
+
+    let issues_to_remove: Vec<String> = vec![
+        &env,
+        String::from_str(&env, "issue-1"),
+        String::from_str(&env, "issue-3"),
+    ];
+    client.remove_issues(&digicus_repo(&env), &issues_to_remove.clone());
+}
+
+#[test]
+#[should_panic]
+fn remove_issues_that_do_not_exist() {
+    let (env, client, _config) = setup_contract();
+
+    let repos_to_add: Vec<String> = vec![&env, soroban_sdk_repo(&env)];
+    client.add_repos(&repos_to_add.clone());
+
+    let issues_to_add: Vec<String> = vec![
+        &env,
+        String::from_str(&env, "issue-1"),
+        String::from_str(&env, "issue-2"),
+        String::from_str(&env, "issue-3"),
+    ];
+    client.add_issues(&soroban_sdk_repo(&env), &issues_to_add.clone());
+
+    let issues_to_remove: Vec<String> = vec![
+        &env,
+        String::from_str(&env, "issue-1"),
+        String::from_str(&env, "issue-4"),
+    ];
+    client.remove_issues(&soroban_sdk_repo(&env), &issues_to_remove.clone());
+}
+
+fn assert_repo_names(actual: Vec<String>, expected: Vec<String>) {
+    assert_eq!(actual.len(), expected.len());
+
+    for repo in actual {
+        assert!(expected.contains(&repo));
+    }
 }

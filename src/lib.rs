@@ -1,7 +1,7 @@
 #![no_std]
 use crate::extensions::env_extensions::EnvExtensions;
 use soroban_sdk::{
-    contract, contractimpl, log, panic_with_error, Address, BytesN, Env, String, Vec,
+    contract, contractimpl, log, panic_with_error, Address, BytesN, Env, Map, String, Vec,
 };
 use types::config_data::ConfigData;
 use types::error::Error;
@@ -44,14 +44,14 @@ impl GithubOracleContract {
         Self::__add_repos(&e, repos);
     }
 
+    pub fn add_issues(e: Env, repo_name: String, issues: Vec<String>) {
+        e.panic_if_not_admin();
+        Self::__add_issues(&e, repo_name, issues);
+    }
+
     pub fn clear_repos(e: Env) {
         e.panic_if_not_admin();
-
-        e.get_repos()
-            .iter()
-            .for_each(|repo| e.remove_repo_index(&repo));
-
-        e.set_repos(Vec::new(&e));
+        e.set_repos(Map::new(&e));
     }
 
     pub fn remove_repos(e: Env, repos: Vec<String>) {
@@ -59,8 +59,27 @@ impl GithubOracleContract {
         Self::__remove_repos(&e, repos);
     }
 
+    pub fn remove_issues(e: Env, repo_name: String, issues: Vec<String>) {
+        e.panic_if_not_admin();
+        Self::__remove_issues(&e, repo_name, issues);
+    }
+
     pub fn get_repos(e: Env) -> Vec<String> {
+        e.get_repos().keys()
+    }
+
+    pub fn get_repos_and_issues(e: Env) -> Map<String, Map<String, String>> {
         e.get_repos()
+    }
+
+    pub fn get_issues_for_repo(e: Env, repo_name: String) -> Map<String, String> {
+        let issues = e.get_repos().get(repo_name);
+
+        if issues.is_none() {
+            panic_with_error!(&e, Error::RepoMissing);
+        }
+
+        issues.unwrap()
     }
 
     pub fn update_contract(e: Env, wasm_hash: BytesN<32>) {
@@ -72,11 +91,11 @@ impl GithubOracleContract {
         let mut current_repos = e.get_repos();
         for repo in repos.iter() {
             //check if the asset has been already added
-            if e.get_repo_index(&repo).is_some() {
+            if current_repos.contains_key(repo.clone()) {
                 panic_with_error!(&e, Error::RepoAlreadyExists);
             }
-            e.set_repo_index(&repo, current_repos.len());
-            current_repos.push_back(repo);
+
+            current_repos.set(repo.clone(), Map::new(e));
         }
         if current_repos.len() >= 256 {
             panic_with_error!(&e, Error::RepoLimitExceeded);
@@ -84,18 +103,55 @@ impl GithubOracleContract {
         e.set_repos(current_repos);
     }
 
+    fn __add_issues(e: &Env, repo: String, issues: Vec<String>) {
+        let mut current_repos = e.get_repos();
+        if !current_repos.contains_key(repo.clone()) {
+            panic_with_error!(&e, Error::RepoMissing);
+        }
+
+        let mut current_issues = current_repos.get(repo.clone()).unwrap();
+        for issue in issues.iter() {
+            //check if the issue has been already added
+            if current_issues.contains_key(issue.clone()) {
+                panic_with_error!(&e, Error::IssueAlreadyExists);
+            }
+
+            current_issues.set(issue.clone(), String::from_str(e, "unclaimed"));
+        }
+        if current_issues.len() >= 512 {
+            panic_with_error!(&e, Error::IssueLimitExceeded);
+        }
+        current_repos.set(repo.clone(), current_issues);
+        e.set_repos(current_repos);
+    }
+
     fn __remove_repos(e: &Env, repos: Vec<String>) {
         let mut current_repos = e.get_repos();
         for repo in repos.iter() {
-            let index = e.get_repo_index(&repo);
-            if index.is_none() {
+            if !current_repos.contains_key(repo.clone()) {
                 panic_with_error!(&e, Error::RepoMissing);
             }
-            let index = index.unwrap();
 
-            current_repos.remove(index as u32);
-            e.remove_repo_index(&repo);
+            current_repos.remove(repo.clone());
         }
+        e.set_repos(current_repos);
+    }
+
+    fn __remove_issues(e: &Env, repo: String, issues: Vec<String>) {
+        let mut current_repos = e.get_repos();
+        if !current_repos.contains_key(repo.clone()) {
+            panic_with_error!(&e, Error::RepoMissing);
+        }
+
+        let mut current_issues = current_repos.get(repo.clone()).unwrap();
+        for issue in issues.iter() {
+            if !current_issues.contains_key(issue.clone()) {
+                panic_with_error!(&e, Error::IssueMissing);
+            }
+
+            current_issues.remove(issue.clone());
+        }
+        current_repos.set(repo.clone(), current_issues);
         e.set_repos(current_repos);
     }
 }

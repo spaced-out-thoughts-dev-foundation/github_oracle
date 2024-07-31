@@ -1,5 +1,5 @@
 use soroban_sdk::storage::Instance;
-use soroban_sdk::{panic_with_error, Address, Env, String, Vec};
+use soroban_sdk::{panic_with_error, Address, Env, Map, String};
 
 use crate::types::error::Error;
 
@@ -19,27 +19,25 @@ pub trait EnvExtensions {
     fn panic_if_not_admin(&self);
 
     // repos
-    fn get_repos(&self) -> Vec<String>;
-    fn set_repos(&self, repos: Vec<String>);
-
-    // repo index
-    fn get_repo_index(&self, repo_name: &String) -> Option<u8>;
-    fn remove_repo_index(&self, repo_name: &String);
-    fn set_repo_index(&self, repo_name: &String, index: u32);
+    fn get_repos(&self) -> Map<String, Map<String, String>>;
+    fn set_repos(&self, repos: Map<String, Map<String, String>>);
 }
+
 impl EnvExtensions for Env {
+    // admin
     fn get_admin(&self) -> Option<Address> {
         get_instance_storage(self).get(&ADMIN_KEY)
     }
 
+    // initialization
     fn set_admin(&self, admin: &Address) {
         get_instance_storage(self).set(&ADMIN_KEY, admin);
     }
-
     fn is_initialized(&self) -> bool {
         get_instance_storage(self).has(&ADMIN_KEY)
     }
 
+    // authorization
     fn panic_if_not_admin(&self) {
         let admin = self.get_admin();
         if admin.is_none() {
@@ -48,30 +46,14 @@ impl EnvExtensions for Env {
         admin.unwrap().require_auth()
     }
 
-    fn get_repos(&self) -> Vec<String> {
+    // repos
+    fn get_repos(&self) -> Map<String, Map<String, String>> {
         get_instance_storage(self)
             .get(&REPOS)
-            .unwrap_or_else(|| Vec::new(self))
+            .unwrap_or_else(|| Map::new(self))
     }
-
-    fn set_repos(&self, repos: Vec<String>) {
+    fn set_repos(&self, repos: Map<String, Map<String, String>>) {
         get_instance_storage(self).set(&REPOS, &repos);
-    }
-
-    fn get_repo_index(&self, repo_name: &String) -> Option<u8> {
-        let index: Option<u32> = get_instance_storage(self).get(repo_name);
-        if index.is_none() {
-            return None;
-        }
-        return Some(index.unwrap() as u8);
-    }
-
-    fn remove_repo_index(&self, repo_name: &String) {
-        get_instance_storage(self).remove(repo_name);
-    }
-
-    fn set_repo_index(&self, repo_name: &String, index: u32) {
-        get_instance_storage(self).set(repo_name, &index);
     }
 }
 
